@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import RxSwift
 import BitcoinCore
 import HsToolKit
 import HdWalletKit
@@ -11,7 +11,7 @@ class Manager {
     private let restoreDataKey = "restore_data"
     private let syncModeKey = "syncMode"
 
-    let adapterSubject = PassthroughSubject<Void, Never>()
+    let adapterSignal = Signal()
     var adapter: BitcoinAdapter?
 
     init() {
@@ -43,17 +43,17 @@ class Manager {
 
         let words = restoreData.components(separatedBy: .whitespacesAndNewlines)
         if words.count > 1 {
-            adapter = BitcoinAdapter(words: words, purpose: configuration.purpose, testMode: configuration.testNet, syncMode: syncMode, logger: logger)
+            adapter = BitcoinAdapter(words: words, purpose: .bip44, testMode: configuration.testNet, syncMode: syncMode, logger: logger)
         } else {
             do {
-                let _ = try HDExtendedKey(extendedKey: restoreData)
-                adapter = BitcoinAdapter(extendedKey: restoreData, purpose: configuration.purpose, testMode: configuration.testNet, syncMode: syncMode, logger: logger)
+                _ = try HDExtendedKey(extendedKey: restoreData)
+                adapter = BitcoinAdapter(extendedKey: restoreData, testMode: configuration.testNet, syncMode: syncMode, logger: logger)
             } catch {
                 adapter = nil
             }
         }
 
-        adapterSubject.send()
+        adapterSignal.notify()
     }
 
     var savedRestoreData: String? {

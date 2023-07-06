@@ -3,6 +3,7 @@ import BitcoinKit
 import BitcoinCore
 import HdWalletKit
 import HsToolKit
+import RxSwift
 
 class BitcoinAdapter: BaseAdapter {
     let bitcoinKit: Kit
@@ -19,11 +20,11 @@ class BitcoinAdapter: BaseAdapter {
         bitcoinKit.delegate = self
     }
 
-    init(extendedKey: String, purpose: Purpose, testMode: Bool, syncMode: BitcoinCore.SyncMode, logger: Logger) {
+    init(extendedKey: String, testMode: Bool, syncMode: BitcoinCore.SyncMode, logger: Logger) {
         let networkType: Kit.NetworkType = testMode ? .testNet : .mainNet
 
         let extendedKey = try! HDExtendedKey(extendedKey: extendedKey)
-        bitcoinKit = try! Kit(extendedKey: extendedKey, purpose: purpose, walletId: "walletId", syncMode: syncMode, networkType: networkType, confirmationsThreshold: 1, logger: logger.scoped(with: "BitcoinKit"))
+        bitcoinKit = try! Kit(extendedKey: extendedKey, walletId: "walletId", syncMode: syncMode, networkType: networkType, confirmationsThreshold: 1, logger: logger.scoped(with: "BitcoinKit"))
 
         super.init(name: "Bitcoin", coinCode: "BTC", abstractKit: bitcoinKit)
         bitcoinKit.delegate = self
@@ -41,23 +42,23 @@ extension BitcoinAdapter: BitcoinCoreDelegate {
     }
 
     func transactionsUpdated(inserted: [TransactionInfo], updated: [TransactionInfo]) {
-        transactionsSubject.send()
+        transactionsSignal.notify()
     }
 
     func transactionsDeleted(hashes: [String]) {
-        transactionsSubject.send()
+        transactionsSignal.notify()
     }
 
     func balanceUpdated(balance: BalanceInfo) {
-        balanceSubject.send()
+        balanceSignal.notify()
     }
 
     func lastBlockInfoUpdated(lastBlockInfo: BlockInfo) {
-        lastBlockSubject.send()
+        lastBlockSignal.notify()
     }
 
     public func kitStateUpdated(state: BitcoinCore.KitState) {
-        syncStateSubject.send()
+        syncStateSignal.notify()
     }
 
 }

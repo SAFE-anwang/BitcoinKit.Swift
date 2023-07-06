@@ -1,10 +1,10 @@
-import Combine
 import UIKit
+import RxSwift
 import Hodler
 import BitcoinCore
 
 class SendController: UIViewController {
-    private var cancellables = Set<AnyCancellable>()
+    private let disposeBag = DisposeBag()
 
     @IBOutlet weak var addressTextField: UITextField?
     @IBOutlet weak var amountTextField: UITextField?
@@ -29,12 +29,13 @@ class SendController: UIViewController {
         picker?.dataSource = self
         picker?.delegate = self
 
-        Manager.shared.adapterSubject
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] in
+        Manager.shared.adapterSignal
+                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background))
+                .observeOn(MainScheduler.instance)
+                .subscribe(onNext: { [weak self] in
                     self?.updateAdapters()
-                }
-                .store(in: &cancellables)
+                })
+                .disposed(by: disposeBag)
 
         updateAdapters()
     }
@@ -178,16 +179,18 @@ class SendController: UIViewController {
             pluginData[HodlerPlugin.id] = HodlerData(lockTimeInterval: self.selectedTimeInterval)
         }
 
-        do {
-            try currentAdapter?.send(to: address, amount: amount, sortType: .shuffle, pluginData: pluginData)
+        currentAdapter?.sendSingle(to: address, amount: amount, sortType: .shuffle, pluginData: pluginData)
+                .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .userInitiated))
+                .observeOn(MainScheduler.instance)
+                .subscribe(onSuccess: { [weak self] _ in
+                    self?.addressTextField?.text = ""
+                    self?.amountTextField?.text = ""
 
-            addressTextField?.text = ""
-            amountTextField?.text = ""
-
-            showSuccess(address: address, amount: amount)
-        } catch {
-            show(error: "Send failed: \(error)")
-        }
+                    self?.showSuccess(address: address, amount: amount)
+                }, onError: { [weak self] error in
+                    self?.show(error: "Send failed: \(error)")
+                })
+                .disposed(by: disposeBag)
     }
 
     private func show(error: String) {
